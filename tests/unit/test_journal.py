@@ -44,6 +44,25 @@ def test_parse_an_old_page():
     assert b.id == "20261001-162501-123456" and b.answer == "Still there."
 
 
+def test_a_horizontal_rule_inside_an_answer_does_not_end_it():
+    page = OLD_PAGE.replace("Two paragraphs, even.", "Part one.\n\n---\n\nPart two, after a rule.")
+    a, b = parse_page(page, "2026-10-01")
+    assert a.answer == "**Yes.** A terminal with *pytest* output.\n\nPart one.\n\n---\n\nPart two, after a rule."
+    assert a.model == "claude-opus-5"
+    assert (b.answer, b.model) == ("Still there.", "demo")
+
+
+def test_backfill_keeps_an_answer_with_a_rule_whole(tmp_path):
+    doubts = tmp_path / "doubts"
+    doubts.mkdir()
+    page = OLD_PAGE.replace("Still there.", "Above.\n\n---\n\nBelow.")
+    (doubts / "2026-10-01.md").write_text(page, encoding="utf-8")
+    journal = Journal(tmp_path)
+    assert journal.backfill() == 2
+    answers = [e.answer for e in journal.entries()]
+    assert answers[1] == "Above.\n\n---\n\nBelow."
+
+
 def test_a_garbled_block_is_skipped():
     assert parse_page("# Doubts\n\n## not a heading\n\ntext\n\n---\n", "2026-10-01") == []
 
