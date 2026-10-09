@@ -107,3 +107,49 @@ def test_find_focuses_search_and_escape_closes(qtbot, window):
     assert window.search.selectedText() == window.search.text()
     shortcuts[QKeySequence(Qt.Key_Escape).toString()].activated.emit()
     assert not window.isVisible()
+
+
+def clipboard_text() -> str:
+    from PySide6.QtGui import QGuiApplication
+
+    return QGuiApplication.clipboard().text()
+
+
+def test_copy_puts_the_selected_thread_on_the_clipboard_as_markdown(qtbot, window):
+    from PySide6.QtGui import QGuiApplication
+
+    QGuiApplication.clipboard().setText("stale")
+    window.list.setCurrentRow(1)
+    qtbot.mouseClick(window.copy, Qt.LeftButton)
+    copied = clipboard_text()
+    assert copied.startswith("**what is the code distance?**")
+    assert "The **minimum** weight of a logical." in copied, "answers stay Markdown, not rendered text"
+    assert "**why odd?**\n\nMajority vote." in copied
+    assert "what is a stabilizer?" not in copied, "only the selected thread"
+    assert window.status.text() == "Copied 2 questions as Markdown."
+
+
+def test_copy_a_single_question_says_so(window):
+    window.list.setCurrentRow(0)
+    window.copy_thread()
+    assert clipboard_text().startswith("**what is a stabilizer?**")
+    assert window.status.text() == "Copied 1 question as Markdown."
+
+
+def test_copy_is_disabled_and_harmless_with_nothing_selected(qtbot, window):
+    from PySide6.QtGui import QGuiApplication
+
+    window.search.setText("zzz")
+    qtbot.waitUntil(lambda: window.list.count() == 0)
+    assert not window.copy.isEnabled()
+    QGuiApplication.clipboard().setText("untouched")
+    window.copy_thread()
+    assert clipboard_text() == "untouched"
+
+
+def test_copy_shortcut(qtbot, window):
+    from PySide6.QtGui import QKeySequence, QShortcut
+
+    shortcuts = {sc.key().toString(): sc for sc in window.findChildren(QShortcut)}
+    shortcuts[QKeySequence("Ctrl+Shift+C").toString()].activated.emit()
+    assert clipboard_text().startswith("**what is a stabilizer?**")
