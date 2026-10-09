@@ -9,6 +9,7 @@ from PIL import Image
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import (
     QDesktopServices,
+    QGuiApplication,
     QImage,
     QKeySequence,
     QPainter,
@@ -153,9 +154,14 @@ class JournalWindow(QWidget):
         self.send = QPushButton("Ask")
         self.send.setObjectName("primary")
         self.send.clicked.connect(self._send)
+        self.copy = QPushButton("Copy")
+        self.copy.setToolTip("Copy this conversation as Markdown (Ctrl+Shift+C)")
+        self.copy.clicked.connect(self.copy_thread)
+        QShortcut(QKeySequence("Ctrl+Shift+C"), self, activated=self.copy_thread)
         row = QHBoxLayout()
         row.addWidget(self.ask, 1)
         row.addWidget(self.send)
+        row.addWidget(self.copy)
         right = QWidget()
         rl = QVBoxLayout(right)
         rl.setContentsMargins(0, 0, 0, 0)
@@ -203,6 +209,7 @@ class JournalWindow(QWidget):
 
     def show_thread(self, thread: Thread | None) -> None:
         self.thread = thread
+        self.copy.setEnabled(thread is not None)
         if thread is None:
             self.shot.show_image(None, [])
             query = self.search.text().strip()
@@ -256,6 +263,16 @@ class JournalWindow(QWidget):
         self._busy = False
         self.status.setText(message)
         self._set_enabled(self.thread is not None)
+
+    def copy_thread(self) -> None:
+        """Put the open conversation on the clipboard as Markdown, to paste into your own notes."""
+        if self.thread is None:
+            return
+        markdown = conversation_markdown(self.thread)
+        QGuiApplication.clipboard().setText(markdown)
+        count = len(self.thread.entries)
+        noun = "question" if count == 1 else "questions"
+        self.status.setText(f"Copied {count} {noun} as Markdown.")
 
     def _open_shot(self) -> None:
         if self.thread is not None:
