@@ -78,18 +78,26 @@ _PAGE_DAY = re.compile(r"^(\d{4}-\d{2}-\d{2})\.md$")
 _HEADING = re.compile(r"^## (\d{2}:\d{2})  (.*)$", re.M)
 _SHOT = re.compile(r"!\[screen\]\((shots/([0-9-]+)\.png)\)")
 _MODEL = re.compile(r"<sub>(.*?)</sub>\s*$", re.S)
+_ENTRY_SEPARATOR = re.compile(r"\n+---\s*$")
 
 
 def parse_page(text: str, day: str) -> list[Entry]:
-    """Entries from one Markdown page. Tolerant: a block it can't read is skipped, not fatal."""
+    """Entries from one Markdown page. Tolerant: a block it can't read is skipped, not fatal.
+
+    Entries are cut at their headings, not at the `---` DoubtLog writes after each one: answers
+    are Markdown, and a horizontal rule inside an answer must not end it.
+    """
     out = []
-    blocks = text.split("\n---\n")
-    for block in blocks:
-        head = _HEADING.search(block)
+    headings = list(_HEADING.finditer(text))
+    for index, head in enumerate(headings):
+        is_last = index + 1 == len(headings)
+        block_end = len(text) if is_last else headings[index + 1].start()
+        block = text[head.start() : block_end]
         shot = _SHOT.search(block)
-        if head is None or shot is None:
+        if shot is None:
             continue
         body = block[shot.end() :].strip()
+        body = _ENTRY_SEPARATOR.sub("", body)
         model_m = _MODEL.search(body)
         model = model_m.group(1) if model_m else ""
         answer = body[: model_m.start()].strip() if model_m else body
