@@ -45,6 +45,7 @@ class Setting:
     kind: type
     default: Any
     choices: tuple[str, ...] | None = None
+    bounds: tuple[int, int] | None = None  # inclusive range for a number
 
 
 SETTINGS: tuple[Setting, ...] = (
@@ -64,7 +65,8 @@ SETTINGS: tuple[Setting, ...] = (
     Setting("user_context", "MARGINALIA_USER_CONTEXT", str, DEFAULT_CONTEXT),
     Setting("log_dir", "MARGINALIA_LOG_DIR", Path, Path.home() / "Marginalia"),
     # Thinking shares this budget on current models, so keep it generous; answers stay short anyway.
-    Setting("max_tokens", "MARGINALIA_MAX_TOKENS", int, 16000),
+    # The same range the Settings window allows; the API rejects 0 or less, so every question would fail.
+    Setting("max_tokens", "MARGINALIA_MAX_TOKENS", int, 16000, bounds=(1024, 128000)),
     # Also save each question as an unlabelled eval case (raw screenshot + case.json) under
     # <log dir>/cases. Off by default: full-resolution screenshots add up, and may be private.
     Setting("save_cases", "MARGINALIA_SAVE_CASES", bool, False),
@@ -183,6 +185,11 @@ def parse(s: Setting, raw: Any, where: str) -> Any:
     if s.choices is not None and value not in s.choices:
         _warn(f"{where}={raw!r} is not one of {', '.join(s.choices)}; using {s.default}.")
         return s.default
+    if s.bounds is not None:
+        low, high = s.bounds
+        if not low <= value <= high:
+            _warn(f"{where}={raw!r} is outside {low} to {high}; using {s.default}.")
+            return s.default
     return value
 
 

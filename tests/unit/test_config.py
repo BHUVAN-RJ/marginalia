@@ -76,6 +76,20 @@ def test_an_unknown_effort_falls_back_to_medium(monkeypatch, caplog):
     assert "MARGINALIA_EFFORT" in caplog.text
 
 
+@pytest.mark.parametrize("value", ["0", "-5", "1023", "128001", "10000000"])
+def test_max_tokens_out_of_range_falls_back(monkeypatch, caplog, value):
+    """Bug: MARGINALIA_MAX_TOKENS=0 reached the API, which rejected every question."""
+    monkeypatch.setenv("MARGINALIA_MAX_TOKENS", value)
+    assert load_config().max_tokens == 16000
+    assert "MARGINALIA_MAX_TOKENS" in caplog.text and "outside 1024 to 128000" in caplog.text
+
+
+@pytest.mark.parametrize("value", ["1024", "128000", "32000"])
+def test_max_tokens_in_range_is_kept(monkeypatch, value):
+    monkeypatch.setenv("MARGINALIA_MAX_TOKENS", value)
+    assert load_config().max_tokens == int(value)
+
+
 
 # the settings file -------------------------------------------------------------------------
 
@@ -111,6 +125,12 @@ def test_a_bad_value_in_the_settings_file_falls_back(store, caplog):
     c = load_config(store=store)
     assert c.max_tokens == 16000 and c.effort == "medium"
     assert c.log_dir == Path.home() / "Notes", "paths expand ~"
+    assert "settings max_tokens" in caplog.text
+
+
+def test_max_tokens_out_of_range_in_the_settings_file_falls_back(store, caplog):
+    store.save({"max_tokens": 0})
+    assert load_config(store=store).max_tokens == 16000
     assert "settings max_tokens" in caplog.text
 
 
